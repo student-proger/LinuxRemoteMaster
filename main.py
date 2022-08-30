@@ -15,17 +15,13 @@ import time
 import json
 import paramiko
 from playsound import playsound
-from threading import Thread, Lock
 import re
 from queue import Queue
 
 # Qt
-from PyQt5 import QtWidgets, QtCore, QtGui
-from PyQt5.QtWidgets import QTableWidgetItem, QLabel, QInputDialog, QComboBox, QMdiSubWindow
+from PyQt5 import QtWidgets, QtCore
+from PyQt5.QtWidgets import QTableWidgetItem, QMdiSubWindow
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtGui import QColor
-from PyQt5.QtCore import QObject
 from PyQt5.Qt import pyqtSignal
 # design
 import mainform
@@ -130,13 +126,6 @@ def loadSettings():
     except:
         logger("Ошибка чтения файла настроек. Возможно нет прав доступа на чтение.")
         messageBox("Критическая ошибка", "Ошибка чтения файла настроек. Возможно нет прав доступа на чтение.")
-
-    # Устанавливаем значения по-умолчанию, если их нет в настройках
-    #if "NotifyFile1" not in settings:
-    #    settings["NotifyFile1"] = path + "sounds/male-1min.mp3"
-
-startPosition = True
-consolebuf = ""
 
 
 class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
@@ -355,19 +344,17 @@ class processWork(QtCore.QThread):
         self.host = host
         self.username = username
         self.password = password
+        self.startPosition = True
+        self.consolebuf = ""
 
     def append_console_string(self, text):
-        global startPosition
-        global consolebuf
-
         text = repr(text)
 
         if text != "''":
             text = text[1:-1]  # избавляемся от кавычек в начале и конце
             while '\\r\\n' in text:
                 text = text.replace('\\r\\n', '\\n')
-            text = re.sub(r'\\x1b\[\d+m', "",
-                          text)  # регулярка для удаления escape последовательностей вида \x1b[33m
+            text = re.sub(r'\\x1b\[\d+m', "", text)  # регулярка для удаления escape последовательностей вида \x1b[33m
 
             skipNext = False
             for i in range(0, len(text)):
@@ -375,22 +362,22 @@ class processWork(QtCore.QThread):
                     skipNext = False
                     continue
                 if text[i] == "\\" and text[i + 1] == "r":
-                    startPosition = True
+                    self.startPosition = True
                     skipNext = True
-                    self.usignal.emit(self.id, consolebuf, False)
+                    self.usignal.emit(self.id, self.consolebuf, False)
                     continue
                 if text[i] == "\\" and text[i + 1] == "n":
-                    startPosition = True
+                    self.startPosition = True
                     skipNext = True
-                    self.usignal.emit(self.id, consolebuf, True)
-                    consolebuf = ""
+                    self.usignal.emit(self.id, self.consolebuf, True)
+                    self.consolebuf = ""
                     continue
-                if startPosition:
-                    consolebuf = text[i]
-                    startPosition = False
+                if self.startPosition:
+                    self.consolebuf = text[i]
+                    self.startPosition = False
                 else:
-                    consolebuf = consolebuf + text[i]
-            self.usignal.emit(self.id, consolebuf, False)
+                    self.consolebuf = self.consolebuf + text[i]
+            self.usignal.emit(self.id, self.consolebuf, False)
 
     def run(self):
         self.statesignal.emit(True)
