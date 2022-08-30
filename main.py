@@ -145,25 +145,25 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         super().__init__()
 
         # Очередь хостов
-        host_queue = Queue()
+        self.host_queue = Queue()
+
+        # Главный таймер перебора хостов
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.on_timer)
+        self.timer.stop()
 
         # Список MDI форм с консолью
-        self.mdi_console = []
+        self.mdi_console = {}
         # Список подформ (необходимо для правильного отображения формочек в mdiArea)
-        self.mdi_console_sub_form = []
+        self.mdi_console_sub_form = {}
+        # Список потоков
+        self.thrn = {}
+        self.count_threads = 0
 
         loadSettings()
         self.loadHostsDB()
 
         self.setupUi(self)  # Это нужно для инициализации нашего дизайна
-
-        for i in range(0, THREADS_COUNT):
-            self.mdi_console.append(MDIForm())
-            self.mdi_console_sub_form.append(QMdiSubWindow())
-            self.mdi_console_sub_form[i].setWidget(self.mdi_console[i])
-            self.mdiArea.addSubWindow(self.mdi_console_sub_form[i])
-            self.mdi_console_sub_form[i].resize(self.mdi_console[i].size())
-            self.mdi_console_sub_form[i].show()
 
         self.loadCommandsButton.clicked.connect(self.loadListCommands)
         self.loadTaskHostsButton.clicked.connect(self.loadListTaskHosts)
@@ -179,6 +179,14 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         #icon = QtGui.QIcon()
         #icon.addPixmap(QtGui.QPixmap(path + "images/alarm_32px.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         #self.setWindowIcon(icon)
+
+    def createConsole(self, id):
+        self.mdi_console[id] = MDIForm()
+        self.mdi_console_sub_form[id] = QMdiSubWindow()
+        self.mdi_console_sub_form[id].setWidget(self.mdi_console[id])
+        self.mdiArea.addSubWindow(self.mdi_console_sub_form[id])
+        self.mdi_console_sub_form[id].resize(self.mdi_console[id].size())
+        self.mdi_console_sub_form[id].show()
 
     @staticmethod
     def loadHostsDB():
@@ -275,15 +283,40 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
     def executeClick(self):
         global thrn
         global list_commands
+        print(list_hosts)
 
+        # Создаём список команд
         list_commands = []
         for i in range(0, self.listCommands.count()):
             s = self.listCommands.item(i).text()
             list_commands.append(s)
 
-        thrn = processWork()
-        thrn.usignal.connect(self.on_data_ready)
-        thrn.start()
+        # Создаём очередь хостов
+        self.host_queue.queue.clear()
+        for row in range(0, self.hostsTable.rowCount()):
+            self.host_queue.put((self.hostsTable.item(row, 0).text(), row))
+
+        self.timer.start(100)
+
+    def on_timer(self):
+        if self.count_threads < THREADS_COUNT:
+            try:
+                s = self.host_queue.get_nowait()
+            except queue.Empty:
+                print("Очередь закончилась.")
+                self.timer.stop()
+                return
+            print("Очередь: " + s[0])
+            id = s[1]
+            host = list_hosts[s[0]]["ip"]
+            username = list_hosts[s[0]]["user"]
+            password = list_hosts[s[0]]["password"]
+
+            self.createConsole(id)
+            self.thrn[id] = processWork(id, host, username, password)
+            self.thrn[id].usignal.connect(self.on_data_ready)
+            self.thrn[id].statesignal.connect(self.on_statesignal)
+            self.thrn[id].start()
 
     def on_data_ready(self, id: int, data: str, newline: bool):
         """ Обработка данных поступивших из потоков
@@ -292,11 +325,17 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         :param data: данные
         :param newline: перенос на новую строку
         """
-        if self.mdi_console[0].listWidget.count() == 0:
-            self.mdi_console[0].listWidget.addItem("")
-        self.mdi_console[0].listWidget.item(self.mdi_console[0].listWidget.count() - 1).setText(data)
+        if self.mdi_console[id].listWidget.count() == 0:
+            self.mdi_console[id].listWidget.addItem("")
+        self.mdi_console[id].listWidget.item(self.mdi_console[id].listWidget.count() - 1).setText(data)
         if newline:
-            self.mdi_console[0].listWidget.addItem("")
+            self.mdi_console[id].listWidget.addItem("")
+
+    def on_statesignal(self, state):
+        if state:
+            self.count_threads = self.count_threads + 1
+        else:
+            self.count_threads = self.count_threads - 1
 
 class MDIForm(QtWidgets.QMainWindow, mdiform.Ui_MDIWindow):
     """Класс MDI окон консолей"""
@@ -308,12 +347,16 @@ class MDIForm(QtWidgets.QMainWindow, mdiform.Ui_MDIWindow):
 class processWork(QtCore.QThread):
     """Поток выполнения команд"""
     usignal = pyqtSignal(object, object, object)
+    statesignal = pyqtSignal(object)
 
-    def __init__(self):
+    def __init__(self, id, host, username, password):
         QtCore.QThread.__init__(self)
+        self.id = id
+        self.host = host
+        self.username = username
+        self.password = password
 
-
-    def append_log(self, text):
+    def append_console_string(self, text):
         global startPosition
         global consolebuf
 
@@ -334,12 +377,12 @@ class processWork(QtCore.QThread):
                 if text[i] == "\\" and text[i + 1] == "r":
                     startPosition = True
                     skipNext = True
-                    self.usignal.emit(0, consolebuf, False)
+                    self.usignal.emit(self.id, consolebuf, False)
                     continue
                 if text[i] == "\\" and text[i + 1] == "n":
                     startPosition = True
                     skipNext = True
-                    self.usignal.emit(0, consolebuf, True)
+                    self.usignal.emit(self.id, consolebuf, True)
                     consolebuf = ""
                     continue
                 if startPosition:
@@ -347,14 +390,15 @@ class processWork(QtCore.QThread):
                     startPosition = False
                 else:
                     consolebuf = consolebuf + text[i]
-            self.usignal.emit(0, consolebuf, False)
+            self.usignal.emit(self.id, consolebuf, False)
 
     def run(self):
-        sess = self.connectToHost("", "", "", 22)
+        self.statesignal.emit(True)
+        sess = self.connectToHost(self.host, self.username, self.password, 22)
         for item in list_commands:
-            print(item)
-            s = self.executeLine(sess, item)
+            self.executeLine(sess, item)
         self.closeConnection(sess)
+        self.statesignal.emit(False)
 
     def connectToHost(self, hostname, username, password, port=22):
         client = paramiko.SSHClient()
@@ -364,7 +408,7 @@ class processWork(QtCore.QThread):
         return client, password
 
     def executeLine(self, session, cmd):
-        self.usignal.emit(0, "# " + cmd, True)
+        self.usignal.emit(self.id, "# " + cmd, True)
 
         channel = session[0].get_transport().open_session()
         channel.get_pty()
@@ -378,14 +422,11 @@ class processWork(QtCore.QThread):
                     channel.send(password + '\n')
                 elif ("is not in the sudoers file" in line) or ("отсутствует в файле sudoers" in line):
                     return False
-            #line = repr(line)
-            self.append_log(line)
-            #print(repr(line))
+            self.append_console_string(line)
 
-            '''if "\n" in line:
-                self.textEdit.append(line)'''
         channel.close()
-        self.usignal.emit(0, "", True)
+        # добавляем пустую строку после результата каждой команды
+        self.usignal.emit(self.id, "", True)
         return True
 
     def closeConnection(self, session):
