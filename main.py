@@ -54,7 +54,7 @@ list_commands = []
 
 def messageBox(title: str, msg: str):
     """
-    Отображение диалогового окна с сообщением
+    Отображение диалогового окна с сообщением.
 
     :param title: заголовок окна
     :param msg: сообщение
@@ -68,7 +68,7 @@ def messageBox(title: str, msg: str):
 
 def logger(msg):
     """
-    Логирование
+    Логирование.
 
     :param msg: текст сообщения
     """
@@ -84,7 +84,7 @@ def logger(msg):
 
 
 def isWindows():
-    """Проверяет, под какой ОС запущено приложение. True, если Windows."""
+    """ Проверяет, под какой ОС запущено приложение. True, если Windows. """
     if os.name == "nt":
         return True
     else:
@@ -92,7 +92,7 @@ def isWindows():
 
 
 def saveSettings():
-    """Сохранение настроек в файл"""
+    """ Сохранение настроек в файл. """
     logger("Сохранение настроек.")
     try:
         with open(datapath + 'settings.json', 'w') as f:
@@ -103,7 +103,7 @@ def saveSettings():
 
 
 def loadSettings():
-    """Загрузка настроек из файла"""
+    """ Загрузка настроек из файла. """
     global settings
     global list_hosts
     global list_groups
@@ -129,7 +129,7 @@ def loadSettings():
 
 
 class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
-    """Класс главного окна приложения"""
+    """ Класс главного окна приложения. """
     def __init__(self):
         super().__init__()
 
@@ -170,6 +170,11 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         #self.setWindowIcon(icon)
 
     def createConsole(self, id):
+        """
+        Создание окна консоли.
+
+        :param id: ID хоста
+        """
         self.mdi_console[id] = MDIForm()
         self.mdi_console_sub_form[id] = QMdiSubWindow()
         self.mdi_console_sub_form[id].setWidget(self.mdi_console[id])
@@ -179,9 +184,7 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
 
     @staticmethod
     def loadHostsDB():
-        '''
-        Загрузка списка всех хостов
-        '''
+        """ Загрузка списка всех хостов. """
         global list_hosts
         global list_groups
         list_hosts = {}
@@ -210,9 +213,7 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         #print(list_groups)
     
     def loadListCommands(self):
-        '''
-        Загрузка списка команд из файла.
-        '''
+        """ Загрузка списка команд из файла. """
         fname = QFileDialog.getOpenFileName(self, 'Выбор файла', path, "Текстовые файлы (*.txt);;Все файлы (*.*)")[0]
         if fname != "":
             try:
@@ -225,9 +226,7 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
                 messageBox("Linux Remote Master", "Ошибка загрузки файла с командами.")
 
     def saveListCommands(self):
-        '''
-        Сохранение списка команд в файл.
-        '''
+        """ Сохранение списка команд в файл. """
         fname = QFileDialog.getSaveFileName(self, 'Выбор файла', path, "Текстовые файлы (*.txt);;Все файлы (*.*)")[0]
         if fname != "":
             try:
@@ -239,15 +238,11 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
                 messageBox("Linux Remote Master", "Ошибка сохранения файла с командами.")
 
     def clearListCommands(self):
-        '''
-        Очистка списка команд.
-        '''
+        """ Очистка списка команд. """
         self.listCommands.clear()
 
     def loadListTaskHosts(self):
-        '''
-        Загрузка списка хостов из файла для задания.
-        '''
+        """ Загрузка списка хостов из файла для задания. """
         fname = QFileDialog.getOpenFileName(self, 'Выбор файла', path, "Текстовые файлы (*.txt);;Все файлы (*.*)")[0]
         if fname != "":
 
@@ -268,11 +263,9 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
             #self.hostsTable.setVerticalHeaderLabels(vh)
             self.hostsTable.resizeColumnsToContents()
 
-
     def executeClick(self):
-        global thrn
+        """ Обработчик клика по кнопке запуска выполнения команд. """
         global list_commands
-        print(list_hosts)
 
         # Создаём список команд
         list_commands = []
@@ -288,6 +281,7 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         self.timer.start(100)
 
     def on_timer(self):
+        """ Обработчик событий таймера. """
         if self.count_threads < THREADS_COUNT:
             try:
                 s = self.host_queue.get_nowait()
@@ -308,7 +302,8 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
             self.thrn[id].start()
 
     def on_data_ready(self, id: int, data: str, newline: bool):
-        """ Обработка данных поступивших из потоков
+        """
+        Обработка данных поступивших из потоков.
 
         :param id: ID потока
         :param data: данные
@@ -320,25 +315,41 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         if newline:
             self.mdi_console[id].listWidget.addItem("")
 
-    def on_statesignal(self, state):
+    def on_statesignal(self, state: bool):
+        """
+        Обработка события запуска/останова потока.
+
+        :param state: True - старт потока, False - завершение
+        """
         if state:
             self.count_threads = self.count_threads + 1
         else:
             self.count_threads = self.count_threads - 1
 
+
 class MDIForm(QtWidgets.QMainWindow, mdiform.Ui_MDIWindow):
-    """Класс MDI окон консолей"""
+    """ Класс MDI окон консолей """
     def __init__(self):
         super().__init__()
         self.setupUi(self)
 
 
 class processWork(QtCore.QThread):
-    """Поток выполнения команд"""
+    """ Класс потока выполнения команд """
+    # Сигнал для передачи результатов выполнения команд в консоль
     usignal = pyqtSignal(object, object, object)
+    # Сигнал состояния потока
     statesignal = pyqtSignal(object)
 
     def __init__(self, id, host, username, password):
+        """
+        Инициализация экземпляра потока.
+
+        :param id: ID хоста
+        :param host: IP хоста
+        :param username: имя пользователя
+        :param password: пароль
+        """
         QtCore.QThread.__init__(self)
         self.id = id
         self.host = host
@@ -348,6 +359,12 @@ class processWork(QtCore.QThread):
         self.consolebuf = ""
 
     def append_console_string(self, text):
+        """
+        Добавление строки результата выполнения команды в консоль. Учитывается наличие escape-последовательностей,
+        в т.ч. стирание строки (например, прогресс при выполнении команды wget).
+
+        :param text: текст, который необходимо отправить в консоль
+        """
         text = repr(text)
 
         if text != "''":
@@ -361,18 +378,18 @@ class processWork(QtCore.QThread):
                 if skipNext:
                     skipNext = False
                     continue
-                if text[i] == "\\" and text[i + 1] == "r":
+                if text[i] == "\\" and text[i + 1] == "r":  # символ перехода в начало строки
                     self.startPosition = True
                     skipNext = True
                     self.usignal.emit(self.id, self.consolebuf, False)
                     continue
-                if text[i] == "\\" and text[i + 1] == "n":
+                if text[i] == "\\" and text[i + 1] == "n":  # символ переноса каретки
                     self.startPosition = True
                     skipNext = True
                     self.usignal.emit(self.id, self.consolebuf, True)
                     self.consolebuf = ""
                     continue
-                if self.startPosition:
+                if self.startPosition:  # курсор в начале строки
                     self.consolebuf = text[i]
                     self.startPosition = False
                 else:
@@ -380,6 +397,7 @@ class processWork(QtCore.QThread):
             self.usignal.emit(self.id, self.consolebuf, False)
 
     def run(self):
+        """ Запуск потока. """
         self.statesignal.emit(True)
         sess = self.connectToHost(self.host, self.username, self.password, 22)
         for item in list_commands:
@@ -387,7 +405,17 @@ class processWork(QtCore.QThread):
         self.closeConnection(sess)
         self.statesignal.emit(False)
 
-    def connectToHost(self, hostname, username, password, port=22):
+    @staticmethod
+    def connectToHost(hostname, username, password, port=22):
+        """
+        Подключение к хосту по SSH.
+
+        :param hostname: IP хоста
+        :param username: имя пользователя
+        :param password: пароль
+        :param port: порт SSH
+        :return: кортеж из объекта-клиента SSH и пароля пользователя
+        """
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.connect(hostname=hostname, username=username, password=password, port=port)
@@ -395,6 +423,13 @@ class processWork(QtCore.QThread):
         return client, password
 
     def executeLine(self, session, cmd):
+        """
+        Выполнение команды для указанного подключения.
+
+        :param session: кортеж из объекта-клиента SSH и пароля пользователя
+        :param cmd: команда
+        :return: True, если команда выполнена
+        """
         self.usignal.emit(self.id, "# " + cmd, True)
 
         channel = session[0].get_transport().open_session()
@@ -416,7 +451,13 @@ class processWork(QtCore.QThread):
         self.usignal.emit(self.id, "", True)
         return True
 
-    def closeConnection(self, session):
+    @staticmethod
+    def closeConnection(session):
+        """
+        Закрытие подключения.
+
+        :param session: кортеж из объекта-клиента SSH и пароля пользователя
+        """
         session[0].close()
 
 
