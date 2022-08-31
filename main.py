@@ -147,7 +147,10 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         self.mdi_console_sub_form = {}
         # Список потоков
         self.thrn = {}
+        # Текущее количество запущенных потоков
         self.count_threads = 0
+        # Завершено хостов
+        self.completed = 0
 
         loadSettings()
         self.loadHostsDB()
@@ -161,6 +164,8 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         self.saveCommandsAction.triggered.connect(self.saveListCommands)
         self.clearCommandsAction.triggered.connect(self.clearListCommands)
         self.loadTaskHostsAction.triggered.connect(self.loadListTaskHosts)
+
+        self.progressBar.setValue(0)
 
         # В файле mainform.py не учитывается возможность несовпадения каталога программы с рабочим каталогом.
         # Такое происходит, например, при автостарте программы. И в этом случае изображения не подгружаются.
@@ -278,6 +283,10 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         for row in range(0, self.hostsTable.rowCount()):
             self.host_queue.put((self.hostsTable.item(row, 0).text(), row))
 
+        self.progressBar.setMaximum(self.hostsTable.rowCount())
+        self.progressBar.setValue(0)
+        self.completed = 0
+
         self.timer.start(100)
 
     def on_timer(self):
@@ -325,6 +334,8 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
             self.count_threads = self.count_threads + 1
         else:
             self.count_threads = self.count_threads - 1
+            self.completed = self.completed + 1
+            self.progressBar.setValue(self.completed)
 
 
 class MDIForm(QtWidgets.QMainWindow, mdiform.Ui_MDIWindow):
