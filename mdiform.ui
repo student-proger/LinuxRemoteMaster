@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>446</width>
-    <height>277</height>
+    <width>455</width>
+    <height>280</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,7 +16,14 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <widget class="QListWidget" name="listWidget"/>
+     <widget class="QListWidget" name="listWidget">
+      <property name="font">
+       <font>
+        <family>Consolas</family>
+        <pointsize>10</pointsize>
+       </font>
+      </property>
+     </widget>
     </item>
    </layout>
   </widget>
@@ -25,7 +32,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>446</width>
+     <width>455</width>
      <height>21</height>
     </rect>
    </property>

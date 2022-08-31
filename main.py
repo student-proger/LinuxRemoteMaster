@@ -26,6 +26,7 @@ from PyQt5.Qt import pyqtSignal
 # design
 import mainform
 import mdiform
+import aboutform
 
 VER = "0.0.1"
 
@@ -132,6 +133,7 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
     """ Класс главного окна приложения. """
     def __init__(self):
         super().__init__()
+        self.setupUi(self)
 
         # Очередь хостов
         self.host_queue = Queue()
@@ -155,7 +157,7 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         loadSettings()
         self.loadHostsDB()
 
-        self.setupUi(self)  # Это нужно для инициализации нашего дизайна
+        self.aboutwindow = AboutApp()
 
         self.loadCommandsButton.clicked.connect(self.loadListCommands)
         self.loadTaskHostsButton.clicked.connect(self.loadListTaskHosts)
@@ -164,8 +166,10 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         self.saveCommandsAction.triggered.connect(self.saveListCommands)
         self.clearCommandsAction.triggered.connect(self.clearListCommands)
         self.loadTaskHostsAction.triggered.connect(self.loadListTaskHosts)
+        self.aboutAction.triggered.connect(self.aboutClick)
 
         self.progressBar.setValue(0)
+        self.setWindowTitle("Linux Remote Master v" + VER)
 
         # В файле mainform.py не учитывается возможность несовпадения каталога программы с рабочим каталогом.
         # Такое происходит, например, при автостарте программы. И в этом случае изображения не подгружаются.
@@ -174,17 +178,19 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         #icon.addPixmap(QtGui.QPixmap(path + "images/alarm_32px.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         #self.setWindowIcon(icon)
 
-    def createConsole(self, id):
+    def createConsole(self, id, title):
         """
         Создание окна консоли.
 
         :param id: ID хоста
+        :param title: Заголовок окна
         """
         self.mdi_console[id] = MDIForm()
         self.mdi_console_sub_form[id] = QMdiSubWindow()
         self.mdi_console_sub_form[id].setWidget(self.mdi_console[id])
         self.mdiArea.addSubWindow(self.mdi_console_sub_form[id])
         self.mdi_console_sub_form[id].resize(self.mdi_console[id].size())
+        self.mdi_console_sub_form[id].setWindowTitle(title)
         self.mdi_console_sub_form[id].show()
 
     @staticmethod
@@ -268,6 +274,9 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
             #self.hostsTable.setVerticalHeaderLabels(vh)
             self.hostsTable.resizeColumnsToContents()
 
+    def aboutClick(self):
+        self.aboutwindow.exec_()
+
     def executeClick(self):
         """ Обработчик клика по кнопке запуска выполнения команд. """
         global list_commands
@@ -304,7 +313,7 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
             username = list_hosts[s[0]]["user"]
             password = list_hosts[s[0]]["password"]
 
-            self.createConsole(id)
+            self.createConsole(id, s[0] + " [" + host + "]")
             self.thrn[id] = processWork(id, host, username, password)
             self.thrn[id].usignal.connect(self.on_data_ready)
             self.thrn[id].statesignal.connect(self.on_statesignal)
@@ -343,6 +352,14 @@ class MDIForm(QtWidgets.QMainWindow, mdiform.Ui_MDIWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+
+
+class AboutApp(QtWidgets.QDialog, aboutform.Ui_AboutDialog):
+    """ Класс окна <О программе> """
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+        self.versionLabel.setText("Версия " + VER)
 
 
 class processWork(QtCore.QThread):
