@@ -256,7 +256,6 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         """ Загрузка списка хостов из файла для задания. """
         fname = QFileDialog.getOpenFileName(self, 'Выбор файла', path, "Текстовые файлы (*.txt);;Все файлы (*.*)")[0]
         if fname != "":
-
             f = open(fname, "rt")
             self.hostsTable.clear()
             self.hostsTable.setRowCount(0)
@@ -264,12 +263,24 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
             row = 0
             for item in f:
                 item = item.strip()
-                if item in list_hosts:
-                    ip = list_hosts[item]["ip"]
-                    self.hostsTable.setRowCount(row + 1)
-                    self.hostsTable.setItem(row, 0, QTableWidgetItem(item.strip()))
-                    self.hostsTable.setItem(row, 1, QTableWidgetItem(ip))
-                    row = row + 1
+                if item[0] == "@":  # Группа
+                    item = item[1:]
+                    if item in list_groups:
+                        gr = list_groups[item]
+                        print(gr)
+                        for h in gr:
+                            ip = list_hosts[h]["ip"]
+                            self.hostsTable.setRowCount(row + 1)
+                            self.hostsTable.setItem(row, 0, QTableWidgetItem(h.strip()))
+                            self.hostsTable.setItem(row, 1, QTableWidgetItem(ip))
+                            row = row + 1
+                else:  # Хост
+                    if item in list_hosts:
+                        ip = list_hosts[item]["ip"]
+                        self.hostsTable.setRowCount(row + 1)
+                        self.hostsTable.setItem(row, 0, QTableWidgetItem(item.strip()))
+                        self.hostsTable.setItem(row, 1, QTableWidgetItem(ip))
+                        row = row + 1
             f.close()
             #self.hostsTable.setVerticalHeaderLabels(vh)
             self.hostsTable.resizeColumnsToContents()
