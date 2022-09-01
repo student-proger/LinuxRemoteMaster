@@ -439,9 +439,12 @@ class processWork(QtCore.QThread):
         """ Запуск потока. """
         self.statesignal.emit(True)
         sess = self.connectToHost(self.host, self.username, self.password, 22)
-        for item in list_commands:
-            self.executeLine(sess, item)
-        self.closeConnection(sess)
+        if sess != False:
+            for item in list_commands:
+                self.executeLine(sess, item)
+            self.closeConnection(sess)
+        else:
+            self.usignal.emit(self.id, "Ошибка подключения", True)
         self.statesignal.emit(False)
 
     @staticmethod
@@ -453,11 +456,15 @@ class processWork(QtCore.QThread):
         :param username: имя пользователя
         :param password: пароль
         :param port: порт SSH
-        :return: кортеж из объекта-клиента SSH и пароля пользователя
+        :return: кортеж из объекта-клиента SSH и пароля пользователя. При ошибке подключения возвращается False.
         """
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(hostname=hostname, username=username, password=password, port=port)
+        try:
+            client.connect(hostname=hostname, username=username, password=password, port=port)
+        except TimeoutError:
+            del(client)
+            return False
 
         return client, password
 
