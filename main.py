@@ -9,6 +9,7 @@
 
 import os
 import queue
+import socket
 import sys  # sys нужен для передачи argv в QApplication
 from datetime import datetime
 import time
@@ -19,10 +20,10 @@ import re
 from queue import Queue
 
 # Qt
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QTableWidgetItem, QMdiSubWindow
-from PyQt5.QtWidgets import QMessageBox, QFileDialog
+from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5.QtWidgets import QTableWidgetItem, QMdiSubWindow, QMessageBox, QFileDialog, QMdiArea
 from PyQt5.Qt import pyqtSignal
+from PyQt5.QtGui import QColor
 # design
 import mainform
 import mdiform
@@ -167,6 +168,8 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         self.clearCommandsAction.triggered.connect(self.clearListCommands)
         self.loadTaskHostsAction.triggered.connect(self.loadListTaskHosts)
         self.aboutAction.triggered.connect(self.aboutClick)
+        self.subWindowViewAction.triggered.connect(self.subWindowView)
+        self.tabbedWindowViewAction.triggered.connect(self.tabbedWindowView)
 
         self.progressBar.setValue(0)
         self.setWindowTitle("Linux Remote Master v" + VER)
@@ -192,6 +195,12 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         self.mdi_console_sub_form[id].resize(self.mdi_console[id].size())
         self.mdi_console_sub_form[id].setWindowTitle(title)
         self.mdi_console_sub_form[id].show()
+
+    def subWindowView(self):
+        self.mdiArea.setViewMode(QMdiArea.SubWindowView)
+
+    def tabbedWindowView(self):
+        self.mdiArea.setViewMode(QMdiArea.TabbedView)
 
     @staticmethod
     def loadHostsDB():
@@ -259,7 +268,7 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
             f = open(fname, "rt")
             self.hostsTable.clear()
             self.hostsTable.setRowCount(0)
-            self.hostsTable.setHorizontalHeaderLabels(["Хост", "IP"])
+            self.hostsTable.setHorizontalHeaderLabels(["Хост", "IP", "Статус"])
             row = 0
             for item in f:
                 item = item.strip()
@@ -282,7 +291,6 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
                         self.hostsTable.setItem(row, 1, QTableWidgetItem(ip))
                         row = row + 1
             f.close()
-            #self.hostsTable.setVerticalHeaderLabels(vh)
             self.hostsTable.resizeColumnsToContents()
 
     def aboutClick(self):
@@ -328,6 +336,7 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
             self.thrn[id] = processWork(id, host, username, password)
             self.thrn[id].usignal.connect(self.on_data_ready)
             self.thrn[id].statesignal.connect(self.on_statesignal)
+            self.thrn[id].progress_signal.connect(self.on_progress_signal)
             self.thrn[id].start()
 
     def on_data_ready(self, id: int, data: str, newline: bool):
@@ -357,6 +366,35 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
             self.completed = self.completed + 1
             self.progressBar.setValue(self.completed)
 
+    def on_progress_signal(self, id, progress, flag):
+        """
+        Обработка событий прогресса выполнения команд.
+
+        :param id: ID хоста
+        :param progress: текущий прогресс
+        :param flag: флаг ошибки: 0 - OK, 1 - Готов, -1 - ошибка подключения, -2 - ошибка команды
+        """
+        self.hostsTable.setItem(id, 2, QTableWidgetItem(progress))
+        if flag == 1:
+            for i in range(0, 3):
+                self.hostsTable.item(id, i).setBackground(QColor(184, 251, 170))
+            icon = QtGui.QIcon()
+            icon.addPixmap(QtGui.QPixmap(path + "images/checked-checkbox-24.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            self.mdi_console_sub_form[id].setWindowIcon(icon)
+        elif flag == -1:
+            for i in range(0, 3):
+                self.hostsTable.item(id, i).setBackground(QColor(255, 166, 166))
+            icon = QtGui.QIcon()
+            icon.addPixmap(QtGui.QPixmap(path + "images/error-24.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            self.mdi_console_sub_form[id].setWindowIcon(icon)
+        elif flag == -2:
+            for i in range(0, 3):
+                self.hostsTable.item(id, i).setBackground(QColor(248, 248, 116))
+            icon = QtGui.QIcon()
+            icon.addPixmap(QtGui.QPixmap(path + "images/error-24.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            self.mdi_console_sub_form[id].setWindowIcon(icon)
+        self.hostsTable.resizeColumnsToContents()
+
 
 class MDIForm(QtWidgets.QMainWindow, mdiform.Ui_MDIWindow):
     """ Класс MDI окон консолей """
@@ -379,6 +417,8 @@ class processWork(QtCore.QThread):
     usignal = pyqtSignal(object, object, object)
     # Сигнал состояния потока
     statesignal = pyqtSignal(object)
+    # Сигнал прогресса выполнения
+    progress_signal = pyqtSignal(object, object, object)
 
     def __init__(self, id, host, username, password):
         """
@@ -439,12 +479,23 @@ class processWork(QtCore.QThread):
         """ Запуск потока. """
         self.statesignal.emit(True)
         sess = self.connectToHost(self.host, self.username, self.password, 22)
-        if sess != False:
+        if sess != False:  # Удалось подключиться
+            row = 1
+            ok = True
+            # По очереди отправляем все команды из списка на выполнение
             for item in list_commands:
-                self.executeLine(sess, item)
+                self.progress_signal.emit(self.id, str(row) + "/" + str(len(list_commands)), 0)
+                ok = self.executeLine(sess, item)
+                if not ok:
+                    break
             self.closeConnection(sess)
+            if ok == True:
+                self.progress_signal.emit(self.id, "Готово", 1)
+            else:
+                self.progress_signal.emit(self.id, ok, -2)
         else:
             self.usignal.emit(self.id, "Ошибка подключения", True)
+            self.progress_signal.emit(self.id, "Ошибка", -1)
         self.statesignal.emit(False)
 
     @staticmethod
@@ -461,9 +512,10 @@ class processWork(QtCore.QThread):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            client.connect(hostname=hostname, username=username, password=password, port=port)
+            client.connect(hostname=hostname, username=username, password=password, port=port, timeout=5)
         except TimeoutError:
-            del(client)
+            return False
+        except socket.timeout:
             return False
 
         return client, password
@@ -480,17 +532,20 @@ class processWork(QtCore.QThread):
 
         channel = session[0].get_transport().open_session()
         channel.get_pty()
-        channel.settimeout(30)
+        channel.settimeout(60)
         password = session[1]
         channel.exec_command(cmd)
 
-        for line in iter(lambda: channel.recv(65535).decode(), ""):
-            if cmd.startswith("sudo "):
-                if line.startswith("[sudo] password "):
-                    channel.send(password + '\n')
-                elif ("is not in the sudoers file" in line) or ("отсутствует в файле sudoers" in line):
-                    return False
-            self.append_console_string(line)
+        try:
+            for line in iter(lambda: channel.recv(65535).decode(), ""):
+                if cmd.startswith("sudo "):
+                    if line.startswith("[sudo] password "):
+                        channel.send(password + '\n')
+                    elif ("is not in the sudoers file" in line) or ("отсутствует в файле sudoers" in line):
+                        return "sudoers"
+                self.append_console_string(line)
+        except socket.timeout:
+            return "timeout"
 
         channel.close()
         # добавляем пустую строку после результата каждой команды
