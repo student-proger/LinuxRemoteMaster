@@ -21,7 +21,7 @@ from queue import Queue
 
 # Qt
 from PyQt5 import QtWidgets, QtCore, QtGui
-from PyQt5.QtWidgets import QTableWidgetItem, QMdiSubWindow, QMessageBox, QFileDialog, QMdiArea
+from PyQt5.QtWidgets import QTableWidgetItem, QMdiSubWindow, QMessageBox, QFileDialog, QMdiArea, QInputDialog, QLineEdit
 from PyQt5.Qt import pyqtSignal
 from PyQt5.QtGui import QColor
 # design
@@ -170,6 +170,7 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         self.aboutAction.triggered.connect(self.aboutClick)
         self.subWindowViewAction.triggered.connect(self.subWindowView)
         self.tabbedWindowViewAction.triggered.connect(self.tabbedWindowView)
+        self.hostsTable.__class__.keyPressEvent = self.hostsTablePressEvent
 
         self.progressBar.setValue(0)
         self.setWindowTitle("Linux Remote Master v" + VER)
@@ -180,6 +181,21 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         #icon = QtGui.QIcon()
         #icon.addPixmap(QtGui.QPixmap(path + "images/alarm_32px.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         #self.setWindowIcon(icon)
+
+    def hostsTablePressEvent(self, event):
+        """
+        Событие нажатия кнопок клавиатуры на списке хостов.
+
+        :param event: событие
+        """
+        if event.key() == QtCore.Qt.Key_Delete:
+            for item in self.hostsTable.selectedItems():
+                self.hostsTable.removeRow(item.row())
+            self.hostsTable.resizeColumnsToContents()
+        if event.key() == QtCore.Qt.Key_Insert:
+            text, okPressed = QInputDialog.getText(self, "Get text", "Your name:", QLineEdit.Normal, "")
+            if okPressed and text != '':
+                print(text)
 
     def createConsole(self, id, title):
         """
