@@ -184,7 +184,7 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
 
     def hostsTablePressEvent(self, event):
         """
-        Событие нажатия кнопок клавиатуры на списке хостов.
+        Событие нажатия кнопок клавиатуры в списке хостов.
 
         :param event: событие
         """
@@ -192,6 +192,10 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
             for item in self.hostsTable.selectedItems():
                 self.hostsTable.removeRow(item.row())
             self.hostsTable.resizeColumnsToContents()
+        if event.key() == QtCore.Qt.Key_Left:
+            self.hostsTable.setFixedWidth(self.hostsTable.width() - 10)
+        if event.key() == QtCore.Qt.Key_Right:
+            self.hostsTable.setFixedWidth(self.hostsTable.width() + 10)
         if event.key() == QtCore.Qt.Key_Insert:
             text, okPressed = QInputDialog.getText(self, "Get text", "Your name:", QLineEdit.Normal, "")
             if okPressed and text != '':
@@ -507,6 +511,17 @@ class processWork(QtCore.QThread):
                 if (item[:3] == "cd ") and ("&&" not in item):
                     self.current_dir = item[3:]
                     continue
+                # Добавляем ко всем командам переход в нужный каталог.
+                # Например, последовательность команд:
+                # ls
+                # cd /tmp
+                # ls
+                # touch ./file
+                #
+                # Будет заменена на следующую:
+                # ls
+                # cd /tmp && ls
+                # cd /tmp && touch ./file
                 if self.current_dir != "":
                     item = "cd " + self.current_dir + " && " + item
                 ok = self.executeLine(sess, item)
