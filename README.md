@@ -5,3 +5,7 @@
 echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
 
 
+cd /tmp
+ls
+
+cd /tmp && ls

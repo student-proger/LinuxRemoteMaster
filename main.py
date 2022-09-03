@@ -452,6 +452,7 @@ class processWork(QtCore.QThread):
         self.password = password
         self.startPosition = True
         self.consolebuf = ""
+        self.current_dir = ""
 
     def append_console_string(self, text):
         """
@@ -501,6 +502,13 @@ class processWork(QtCore.QThread):
             # По очереди отправляем все команды из списка на выполнение
             for item in list_commands:
                 self.progress_signal.emit(self.id, str(row) + "/" + str(len(list_commands)), 0)
+                row = row + 1
+                # Проверяем, не является ли команда переходом в другой каталог
+                if (item[:3] == "cd ") and ("&&" not in item):
+                    self.current_dir = item[3:]
+                    continue
+                if self.current_dir != "":
+                    item = "cd " + self.current_dir + " && " + item
                 ok = self.executeLine(sess, item)
                 if not ok:
                     break
