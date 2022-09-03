@@ -197,9 +197,15 @@ class LRMApp(QtWidgets.QMainWindow, mainform.Ui_MainWindow):
         if event.key() == QtCore.Qt.Key_Right:
             self.hostsTable.setFixedWidth(self.hostsTable.width() + 10)
         if event.key() == QtCore.Qt.Key_Insert:
-            text, okPressed = QInputDialog.getText(self, "Get text", "Your name:", QLineEdit.Normal, "")
+            text, okPressed = QInputDialog.getText(self, "Добавление хоста", "Введите название хоста или его IP:", QLineEdit.Normal, "")
             if okPressed and text != '':
-                print(text)
+                if text in list_hosts:
+                    ip = list_hosts[text]["ip"]
+                    row = self.hostsTable.rowCount()
+                    self.hostsTable.setRowCount(row + 1)
+                    self.hostsTable.setItem(row, 0, QTableWidgetItem(text.strip()))
+                    self.hostsTable.setItem(row, 1, QTableWidgetItem(ip))
+                    self.hostsTable.resizeColumnsToContents()
 
     def createConsole(self, id, title):
         """
