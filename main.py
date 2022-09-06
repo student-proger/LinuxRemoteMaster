@@ -583,7 +583,7 @@ class processWork(QtCore.QThread):
 
         try:
             for line in iter(lambda: channel.recv(65535).decode(), ""):
-                if cmd.startswith("sudo "):
+                if cmd.startswith("sudo ") or ("| sudo " in cmd) or ("&& sudo " in cmd):
                     if line.startswith("[sudo] password ") or line.startswith("[sudo] пароль "):
                         channel.send(password + '\n')
                     elif ("is not in the sudoers file" in line) or ("отсутствует в файле sudoers" in line):
